@@ -70,6 +70,13 @@ uint8_t Program[] = {
   0x76,               // HALT
   // BUFF:
   0xFF                // DEFB 0FFh
+/*
+  // START:
+  0xDB, 0x03,         // IN A,(03h)
+  0xC6, 0x04,         // ADD A,4
+  0xD3, 0x03,         // OUT (03h),A
+  0x18, 0xF8          // JR START
+*/
 };
 
 void setup() {
@@ -92,6 +99,56 @@ void setup() {
   Serial.begin(9600);	    // 9600bpsでポートを開く
 }
 
+static void echo_hex(uint8_t hex_data) {
+  static const uint8_t hex_table[] = {
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+  };
+  Serial.write(hex_table[(hex_data >> 4) & 0x0F]);
+  Serial.write(hex_table[hex_data & 0x0F]);
+}
+
+static void echo_dump(uint8_t *range) {
+  Serial.println(">>> 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
+  for (uint8_t index_i=0; index_i<16; index_i++) {
+    echo_hex(index_i * 16);
+    Serial.print(">");
+    for (uint8_t index_j=0; index_j<16; index_j++) {
+      Serial.print(" ");
+      echo_hex(range[index_i * 16 + index_j]);
+    }
+    Serial.println("");
+  }
+}
+
+static void dump_req(void) {
+  int8_t rcv_data = Serial.read();
+  if (rcv_data == 'm') {
+    Serial.println("RAM[] =");
+    echo_dump(&RAM[0]);
+  }
+  else if (rcv_data == 'i') {
+    Serial.println("IO[] =");
+    echo_dump(&IO[0]);
+  }
+}
+
+static uint8_t event_flag = 0;
+
+static void echo_event(uint8_t *msg, uint8_t flag) {
+  if (flag == 0) {
+    event_flag = 0;
+  }
+  else if (event_flag == 0) {
+    event_flag = 1;
+    Serial.print((const char[])msg);
+    Serial.print(": ADDR=0x");
+    echo_hex(ADDR);
+    Serial.print(", DATA=0x");
+    echo_hex(DATA_R);
+    Serial.println("");
+  }
+}
+
 void loop() {
   // put your main code here, to run repeatedly:
   SET_CLK(U_CLK);
@@ -100,22 +157,28 @@ void loop() {
   if (MREQ && RD) {
     DDRL = 0xFF;          // 出力方向 (DATA)
     DATA_W = RAM[ADDR];   // DATA <- RAM
+    echo_event("MREQ_RD", 1);
   }
   else if (MREQ && WR) {
     DDRL = 0x00;          // 入力方向 (DATA)
     RAM[ADDR] = DATA_R;   // RAM <- DATA
+    echo_event("MREQ_WR", 1);
   }
   else if (IORQ && RD) {
     DDRL = 0xFF;          // 出力方向 (DATA)
     DATA_W = IO[ADDR];    // DATA <- IO
+    echo_event("IORQ_RD", 1);
   }
   else if (IORQ && WR) {
     DDRL = 0x00;          // 入力方向 (DATA)
     IO[ADDR] = DATA_R;    // IO <-  DATA
+    echo_event("IORQ_WR", 1);
   }
   else {
     DDRL = 0x00;          // 入力方向 (DATA)
+    echo_event("", 0);
   }
 
+  dump_req();
   delay(5);
 }
