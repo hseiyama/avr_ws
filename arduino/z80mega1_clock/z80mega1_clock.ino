@@ -132,9 +132,9 @@ static void dump_req(void) {
   }
 }
 
-static uint8_t event_flag = 0;
 
 static void echo_event(uint8_t *msg, uint8_t flag) {
+  static uint8_t event_flag = 0;
   if (flag == 0) {
     event_flag = 0;
   }
@@ -145,6 +145,9 @@ static void echo_event(uint8_t *msg, uint8_t flag) {
     echo_hex(ADDR);
     Serial.print(", DATA=0x");
     echo_hex(DATA_R);
+    if (M1) {
+      Serial.print(" <M1>");
+    }
     Serial.println("");
   }
 }
