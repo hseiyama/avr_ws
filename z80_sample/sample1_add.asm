@@ -1,0 +1,9 @@
+	ORG	0000h
+START:
+	LD	A,3
+	ADD	A,4
+	LD	(BUFF),A
+	HALT
+BUFF:
+	DEFB	0FFh
+	END
