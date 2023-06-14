@@ -22,13 +22,13 @@
 // --------------------------------------------------------------------------------
 
 // Ram memory shared with Z80 mapped 0000H-00FFH
-uint8_t RAM[0x0100];  // Emulated RAM memory
-uint8_t IO[0x0100];   // Emulated IO memory
+static uint8_t RAM[0x0100];  // Emulated RAM memory
+static uint8_t IO[0x0100];   // Emulated IO memory
 
 // Common defines
 #define OFF           (0)
 #define ON            (1)
-#define ON2           (2)     // 特殊フラグとして利用
+#define ON2           (2)     // Special flag
 
 // Pin defines
 #define ADDR          PINA
@@ -87,8 +87,9 @@ static const uint8_t Program[] = {
   0x18, 0xF8          // JR START
 };
 
-// Flag for debug
+// Variable for debug
 static uint8_t debug_clock;
+static uint16_t debug_cycle;
 
 static void echo_dump(uint8_t*);
 static void debug_req(void);
@@ -110,7 +111,8 @@ void setup() {
   memcpy(RAM, Program, sizeof(Program));  // Programをロード
   memset(IO, 0, sizeof(IO));              // IO初期化
 
-  debug_clock = ON;       // デバッグ用のクロック設定
+  debug_clock = ON;       // デバッグ用のクロック設定 (手動)
+  debug_cycle = 5;        // デバッグ用の処理間隔 (5ms)
 
   Serial.begin(9600);	    // 9600bpsでポートを開く
 }
@@ -155,7 +157,7 @@ void loop() {
   }
 
   debug_req();
-  delay(5);
+  delay(debug_cycle);
 }
 
 static void echo_hex(uint8_t hex_data) {
@@ -186,16 +188,30 @@ static void echo_dump(uint8_t* addr_hi, uint8_t* range) {
 
 static void debug_req(void) {
   int8_t rcv_data = Serial.read();
-  if (rcv_data == 'm') {      // RAM領域をダンプ
-    Serial.println("RAM[ 0x0000-0x00FF ] =");
-    echo_dump("00", &RAM[0]);
-  }
-  else if (rcv_data == 'i') { // IO領域をダンプ
-    Serial.println("IO[ 0x00-0xFF ] =");
-    echo_dump("  ", &IO[0]);
-  }
-  else if (rcv_data == 'c') { // クロック設定を変更
-    debug_clock = !debug_clock;
+  switch (rcv_data) {
+    case 'm':   // RAM領域をダンプ
+      Serial.println("RAM[ 0x0000-0x00FF ] =");
+      echo_dump("00", &RAM[0]);
+      break;
+    case 'i':   // IO領域をダンプ
+      Serial.println("IO[ 0x00-0xFF ] =");
+      echo_dump("  ", &IO[0]);
+      break;
+    case 'c':   // クロック設定を変更
+      debug_clock = !debug_clock;
+      break;
+    case '0':   // 処理間隔を変更 (5ms)
+      debug_cycle = 5;
+      break;
+    case '1':   // 処理間隔を変更 (25ms)
+      debug_cycle = 25;
+      break;
+    case '2':   // 処理間隔を変更 (100ms)
+      debug_cycle = 100;
+      break;
+    case '3':   // 処理間隔を変更 (500ms)
+      debug_cycle = 500;
+      break;
   }
 }
 
