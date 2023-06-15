@@ -149,7 +149,7 @@ void loop() {
   }
   else if (RFSH && MREQ) {
     DDRL = 0x00;          // 入力方向 (DATA)
-    debug_log("RFSH_MREQ", ON2);
+    debug_log("RFSH_MREQ", ON2);    // Set Special flag
   }
   else {
     DDRL = 0x00;          // 入力方向 (DATA)
@@ -199,18 +199,22 @@ static void debug_req(void) {
       break;
     case 'c':   // クロック設定を変更
       debug_clock = !debug_clock;
+      debug_cycle = (debug_clock == ON) ? 5 : 500;
       break;
     case '0':   // 処理間隔を変更 (5ms)
       debug_cycle = 5;
       break;
-    case '1':   // 処理間隔を変更 (25ms)
-      debug_cycle = 25;
+    case '1':   // 処理間隔を変更 (50ms)
+      debug_cycle = 50;
       break;
-    case '2':   // 処理間隔を変更 (100ms)
-      debug_cycle = 100;
+    case '2':   // 処理間隔を変更 (200ms)
+      debug_cycle = 200;
       break;
     case '3':   // 処理間隔を変更 (500ms)
       debug_cycle = 500;
+      break;
+    case '4':   // 処理間隔を変更 (1000ms)
+      debug_cycle = 1000;
       break;
   }
 }
@@ -225,7 +229,7 @@ static void debug_log(uint8_t* msg, uint8_t flag) {
     Serial.print((const char[])msg);
     Serial.print(": ADDR=0x");
     echo_hex(ADDR);
-    if (flag == ON) {
+    if (flag == ON) {               // Except for Special flag ON2
       Serial.print(", DATA=0x");
       echo_hex(DATA_R);
     }
