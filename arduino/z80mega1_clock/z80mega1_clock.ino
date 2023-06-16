@@ -41,9 +41,9 @@ static uint8_t IO[0x0100];   // Emulated IO memory
 #define IORQ_PIN      PK2
 #define M1_PIN        PK5
 #define RFSH_PIN      PK6
-#define WAIT_PIN      PG0
+#define INT_PIN       PG0
 #define RESET_PIN     PG1
-#define INT_PIN       PG2
+#define WAIT_PIN      PG2
 #define U_CLK_PIN     PE4
 #define U_RST_PIN     PE5
 
@@ -56,13 +56,17 @@ static uint8_t IO[0x0100];   // Emulated IO memory
 #define RFSH          ((PINK & (1 << RFSH_PIN)) == 0)
 #define U_CLK         ((PINE & (1 << U_CLK_PIN)) == 0)
 #define U_RST         ((PINE & (1 << U_RST_PIN)) == 0)
+#define INT           ((PING & (1 << INT_PIN)) == 0)
+#define WAIT          ((PING & (1 << WAIT_PIN)) == 0)
 
 // Drive pins
 #define SET_CLK(a)    (a == 0 ? PORTB |= (1 << CLK_PIN) : PORTB &= ~(1 << CLK_PIN))
 #define REV_CLK()     (PINB = (1 << CLK_PIN))
-#define SET_WAIT(a)   (a == 0 ? PORTG |= (1 << WAIT_PIN) : PORTG &= ~(1 << WAIT_PIN))
-#define SET_RESET(a)  (a == 0 ? PORTG |= (1 << RESET_PIN) : PORTG &= ~(1 << RESET_PIN))
 #define SET_INT(a)    (a == 0 ? PORTG |= (1 << INT_PIN) : PORTG &= ~(1 << INT_PIN))
+#define REV_INT()     (PING = (1 << INT_PIN))
+#define SET_RESET(a)  (a == 0 ? PORTG |= (1 << RESET_PIN) : PORTG &= ~(1 << RESET_PIN))
+#define SET_WAIT(a)   (a == 0 ? PORTG |= (1 << WAIT_PIN) : PORTG &= ~(1 << WAIT_PIN))
+#define REV_WAIT()    (PING = (1 << WAIT_PIN))
 
 // Mask pins
 #define PORT_MASK_B   (1 << CLK_PIN)
@@ -193,28 +197,45 @@ static void debug_req(void) {
       Serial.println("RAM[ 0x0000-0x00FF ] =");
       echo_dump("00", &RAM[0]);
       break;
-    case 'i':   // IO領域をダンプ
+    case 'o':   // IO領域をダンプ
       Serial.println("IO[ 0x00-0xFF ] =");
       echo_dump("  ", &IO[0]);
       break;
-    case 'c':   // クロック設定を変更
-      debug_clock = !debug_clock;
-      debug_cycle = (debug_clock == ON) ? 5 : 500;
+    case 'i':   // INT端子を反転
+      REV_INT();             // INT反転
+      Serial.print("[INT=");
+      (INT == ON) ? Serial.print("ON") : Serial.print("OFF");
+      Serial.println("]");
       break;
-    case '0':   // 処理間隔を変更 (5ms)
-      debug_cycle = 5;
+    case 'w':   // WAIT端子を反転
+      REV_WAIT();             // WAIT反転
+      Serial.print("[WAIT=");
+      (WAIT == ON) ? Serial.print("ON") : Serial.print("OFF");
+      Serial.println("]");
       break;
-    case '1':   // 処理間隔を変更 (50ms)
-      debug_cycle = 50;
+    case '0':   // デバッグ用の設定変更(0)
+      debug_clock = ON;       // デバッグ用のクロック設定 (手動)
+      debug_cycle = 5;        // デバッグ用の処理間隔 (5ms)
       break;
-    case '2':   // 処理間隔を変更 (200ms)
-      debug_cycle = 200;
+    case '1':   // デバッグ用の設定変更(1)
+      debug_clock = OFF;      // デバッグ用のクロック設定 (自動)
+      debug_cycle = 5;        // デバッグ用の処理間隔 (5ms)
       break;
-    case '3':   // 処理間隔を変更 (500ms)
-      debug_cycle = 500;
+    case '2':   // デバッグ用の設定変更(2)
+      debug_clock = OFF;      // デバッグ用のクロック設定 (自動)
+      debug_cycle = 50;       // デバッグ用の処理間隔 (50ms)
       break;
-    case '4':   // 処理間隔を変更 (1000ms)
-      debug_cycle = 1000;
+    case '3':   // デバッグ用の設定変更(3)
+      debug_clock = OFF;      // デバッグ用のクロック設定 (自動)
+      debug_cycle = 250;      // デバッグ用の処理間隔 (250ms)
+      break;
+    case '4':   // デバッグ用の設定変更(4)
+      debug_clock = OFF;      // デバッグ用のクロック設定 (自動)
+      debug_cycle = 500;      // デバッグ用の処理間隔 (500ms)
+      break;
+    case '5':   // デバッグ用の設定変更(5)
+      debug_clock = OFF;      // デバッグ用のクロック設定 (自動)
+      debug_cycle = 1000;     // デバッグ用の処理間隔 (1000ms)
       break;
   }
 }
