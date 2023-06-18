@@ -188,10 +188,12 @@ void loop() {
   }
   else if (RFSH && MREQ) {
     DDRL = 0x00;          // 入力方向 (DATA)
+    PORTL = 0x00;         // プルアップ無効
     debug_log("RFSH_MREQ", ON2);    // Set Special flag
   }
   else {
     DDRL = 0x00;          // 入力方向 (DATA)
+    PORTL = 0x00;         // プルアップ無効
     debug_log("", OFF);
   }
 
