@@ -1,0 +1,23 @@
+	ORG	0000h
+START:
+	LD	SP,0100h
+	IM	1
+	EI
+LOOP:
+	IN	A,(03h)
+	ADD	A,4
+	OUT	(03h),A
+	LD	(BUFF),A
+	JR	LOOP
+BUFF:
+	DEFB	0FFh
+;
+	ORG	0038h
+INT:
+	EI
+	RETI
+;
+	ORG	0066h
+NMI:
+	RETN
+	END

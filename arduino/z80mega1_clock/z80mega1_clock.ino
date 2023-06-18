@@ -11,6 +11,9 @@
 //  Arduino Pin A9  <--->  Z80 Pin 19 (MREQ)
 //  Arduino Pin A10 <--->  Z80 Pin 20 (IORQ)
 //  Arduino Pin A13 <--->  Z80 Pin 27 (M1)
+//  Arduino Pin A15 <--->  Z80 Pin 28 (RFSH)
+//  Arduino Pin 30  <--->  Z80 Pin 25 (BUSRQ)
+//  Arduino Pin 31  <--->  Z80 Pin 17 (NMI)
 //  Arduino Pin 39  <--->  Z80 PIN 24 (WAIT)
 //  Arduino Pin 40  <--->  Z80 PIN 26 (RESET)
 //  Arduino Pin 41  <--->  Z80 PIN 16 (INT)
@@ -18,7 +21,8 @@
 //  Arduino Pin 2  <--->  Clock Button
 //  Arduino Pin 3  <--->  Reset Button
 // Memory map:
-//  0000-00FF  Ram   256
+//  0000-00FF  RAM   256
+//  00-FF      IO    256
 // --------------------------------------------------------------------------------
 
 // Ram memory shared with Z80 mapped 0000H-00FFH
@@ -35,6 +39,8 @@ static uint8_t IO[0x0100];   // Emulated IO memory
 #define DATA_R        PINL
 #define DATA_W        PORTL
 #define CLK_PIN       PB4
+#define NMI_PIN       PC6
+#define BUSRQ_PIN     PC7
 #define RD_PIN        PD2
 #define WR_PIN        PD3
 #define MREQ_PIN      PK1
@@ -48,6 +54,8 @@ static uint8_t IO[0x0100];   // Emulated IO memory
 #define U_RST_PIN     PE5
 
 // Test pins
+#define NMI           ((PINC & (1 << NMI_PIN)) == 0)
+#define BUSRQ         ((PINC & (1 << BUSRQ_PIN)) == 0)
 #define RD            ((PIND & (1 << RD_PIN)) == 0)
 #define WR            ((PIND & (1 << WR_PIN)) == 0)
 #define MREQ          ((PINK & (1 << MREQ_PIN)) == 0)
@@ -62,6 +70,10 @@ static uint8_t IO[0x0100];   // Emulated IO memory
 // Drive pins
 #define SET_CLK(a)    (a == 0 ? PORTB |= (1 << CLK_PIN) : PORTB &= ~(1 << CLK_PIN))
 #define REV_CLK()     (PINB = (1 << CLK_PIN))
+#define SET_NMI(a)    (a == 0 ? PORTC |= (1 << NMI_PIN) : PORTC &= ~(1 << NMI_PIN))
+#define REV_NMI()     (PINC = (1 << NMI_PIN))
+#define SET_BUSRQ(a)  (a == 0 ? PORTC |= (1 << BUSRQ_PIN) : PORTC &= ~(1 << BUSRQ_PIN))
+#define REV_BUSRQ()   (PINC = (1 << BUSRQ_PIN))
 #define SET_INT(a)    (a == 0 ? PORTG |= (1 << INT_PIN) : PORTG &= ~(1 << INT_PIN))
 #define REV_INT()     (PING = (1 << INT_PIN))
 #define SET_RESET(a)  (a == 0 ? PORTG |= (1 << RESET_PIN) : PORTG &= ~(1 << RESET_PIN))
@@ -70,6 +82,7 @@ static uint8_t IO[0x0100];   // Emulated IO memory
 
 // Mask pins
 #define PORT_MASK_B   (1 << CLK_PIN)
+#define PORT_MASK_C   ((1 << NMI_PIN) + (1 << BUSRQ_PIN))
 #define PORT_MASK_D   ((1 << RD_PIN) + (1 << WR_PIN))
 #define PORT_MASK_E   ((1 << U_CLK_PIN) + (1 << U_RST_PIN))
 #define PORT_MASK_G   ((1 << WAIT_PIN) + (1 << RESET_PIN) + (1 << INT_PIN))
@@ -85,10 +98,30 @@ static const uint8_t Program[] = {
   0xFF                // DEFB 0FFh
 */
   // START:
+  0x31, 0x00, 0x01,   // LD SP,0100h
+  0xED, 0x56,         // IM 1
+  0xFB,               // EI
+  // LOOP:
   0xDB, 0x03,         // IN A,(03h)
   0xC6, 0x04,         // ADD A,4
   0xD3, 0x03,         // OUT (03h),A
-  0x18, 0xF8          // JR START
+  0x32, 0x11, 0x00,   // LD (BUFF),A
+  0x18, 0xF5,         // JR LOOP
+  // BUFF:
+  0xFF,               // DEFB 0FFh
+              0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 0010h-
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 0020h-
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,                                                 // 0030h-
+                      // ORG 0038h
+  0xFB,               // EI
+  0xED, 0x4D,         // RETI
+                                                                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 0030h-
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 0040h-
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 0050h-
+  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,                                                             // 0060h-
+                      // ORG 0066h
+  // NMI:
+  0xED, 0x45          // RETN
 };
 
 // Variable for debug
@@ -103,6 +136,8 @@ void setup() {
   DDRA = 0x00;            // 入力方向 (ADDR)
   DDRB = PORT_MASK_B;     // 出力方向 (CLK)
   PORTB = PORT_MASK_B;    // CLK=ON
+  DDRC = PORT_MASK_C;     // 出力方向 (NMI, BUSRQ)
+  PORTC = PORT_MASK_C;    // NMI=ON, BUSRQ=ON
   DDRD = 0x00;            // 入力方向 (RD, WR)
   DDRE = 0x00;            // 入力方向 (U_CLK, U_RST)
   PORTE = PORT_MASK_E;    // プルアップ設定 (U_CLK, U_RST)
@@ -211,6 +246,18 @@ static void debug_req(void) {
       REV_WAIT();             // WAIT反転
       Serial.print("[WAIT=");
       (WAIT == ON) ? Serial.print("ON") : Serial.print("OFF");
+      Serial.println("]");
+      break;
+    case 'n':   // NMI端子を反転
+      REV_NMI();             // NMI反転
+      Serial.print("[NMI=");
+      (NMI == ON) ? Serial.print("ON") : Serial.print("OFF");
+      Serial.println("]");
+      break;
+    case 'b':   // BUSRQ端子を反転
+      REV_BUSRQ();             // BUSRQ反転
+      Serial.print("[BUSRQ=");
+      (BUSRQ == ON) ? Serial.print("ON") : Serial.print("OFF");
       Serial.println("]");
       break;
     case '0':   // デバッグ用の設定変更(0)
