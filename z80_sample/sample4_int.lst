@@ -1,0 +1,74 @@
+                        ; --------------------------------------
+                        ; zasm: assemble "sample4_int.asm"
+                        ; date: 2023-06-22 03:29:03
+                        ; --------------------------------------
+
+
+0000:                   	ORG	0000h
+0000:                   START:
+0000: 310001   [10]     	LD	SP,0100h
+0003: AF       [14]     	XOR	A		; A <- 0
+0004: ED47     [23]     	LD	I,A
+0006: ED5E     [31]     	IM	2
+                        ;	IM	1
+                        ;	IM	0
+0008: FB       [35]     	EI
+0009:                   LOOP:
+0009: DB03     [11]     	IN	A,(03h)
+000B: C604     [18]     	ADD	A,4
+000D: D303     [29]     	OUT	(03h),A
+000F: 321400   [42]     	LD	(BUFF),A
+0012: 18F5     [54]     	JR	LOOP
+0014:                   BUFF:
+0014: FF                	DEFB	0FFh
+                        ;
+0015: FFFFFFFF          	ORG	0030h
+0019: FF...             
+0030:                   INT0:
+0030: FB       [ 4]     	EI
+0031: ED4D     [18]     	RETI
+                        ;
+0033: FFFFFFFF          	ORG	0038h
+0037: FF                
+0038:                   INT1:
+0038: FB       [ 4]     	EI
+0039: ED4D     [18]     	RETI
+                        ;
+003B: FFFFFFFF          	ORG	0040h
+003F: FF                
+0040:                   INT2:
+0040: FB       [ 4]     	EI
+0041: ED4D     [18]     	RETI
+                        ;
+0043: FFFFFFFF          	ORG	0050h
+0047: FF...             
+0050:                   VEC:
+0050: 4000              	DEFW	0040h
+                        ;
+0052: FFFFFFFF          	ORG	0066h
+0056: FF...             
+0066:                   NMI:
+0066: ED45     [14]     	RETN
+                        	END
+
+
+; +++ segments +++
+
+#CODE          = $0000 =     0,  size = $0068 =   104
+
+; +++ global symbols +++
+
+BUFF    = $0014 =    20          sample4_int.asm:16
+INT0    = $0030 =    48          sample4_int.asm:20 (unused)
+INT1    = $0038 =    56          sample4_int.asm:25 (unused)
+INT2    = $0040 =    64          sample4_int.asm:30 (unused)
+LOOP    = $0009 =     9          sample4_int.asm:10
+NMI     = $0066 =   102          sample4_int.asm:39 (unused)
+START   = $0000 =     0          sample4_int.asm:2 (unused)
+VEC     = $0050 =    80          sample4_int.asm:35 (unused)
+_end    = $0068 =   104          sample4_int.asm:1 (unused)
+_size   = $0068 =   104          sample4_int.asm:1 (unused)
+
+
+total time: 0.0042 sec.
+no errors
