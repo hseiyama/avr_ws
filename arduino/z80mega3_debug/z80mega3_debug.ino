@@ -229,11 +229,11 @@ static void echo_hex(uint8_t hex_data) {
   Serial.write(hex_table[hex_data & 0x0F]);
 }
 
-static void echo_dump(uint8_t* addr_hi, uint8_t* range) {
+static void echo_dump(char *addr_hi, uint8_t* range) {
   Serial.println("     | 00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F");
   Serial.println("-----+-------------------------------------------------");
   for (uint8_t index_i=0; index_i<16; index_i++) {
-    Serial.print((const char[])addr_hi);
+    Serial.print(addr_hi);
     echo_hex(index_i * 16);
     Serial.print(" |");
     for (uint8_t index_j=0; index_j<16; index_j++) {
@@ -261,21 +261,19 @@ static int8_t hexc2num(uint8_t hex_data) {
   return rcode;
 }
 
-static int8_t recv_1byte(uint8_t *data_1byte) {
+static int8_t recv_1byte(uint8_t *pt_data) {
   int8_t rcv_data;
   uint8_t hex_data[2];
-  int8_t datah;
-  int8_t datal;
+  int8_t datah, datal;
   int8_t rcode;
 
-  rcode = 0;
-  *data_1byte = 0;
+  // 1byteデータの取得
+  *pt_data = 0;
   uint8_t count = 0;
   while (count < 2) {
     rcv_data = Serial.read();
     if (rcv_data != -1) {
-      if ((rcv_data == 0x1B) || (rcv_data == 0x0D)) {  // ESC or CR
-        rcode = -1;
+      if ((rcv_data == 0x1B) || (rcv_data == 0x0D)) {  // ESC or CR key
         break;
       }
       else {
@@ -284,58 +282,54 @@ static int8_t recv_1byte(uint8_t *data_1byte) {
       }
     }
   }
-
-  if (count >= 2) {
+  // 結果判定
+  if (count < 2) {
+      rcode = -1;       // 終了コード (ESC or CR key)
+      Serial.println("");
+  }
+  else {
     datah = hexc2num(hex_data[0]);
     datal = hexc2num(hex_data[1]);
     if ((datah < 0) || (datal < 0)) {
-      rcode = -2;
+      rcode = -2;     // 16進数の文字不一致
+      Serial.println("");
+      Serial.println("Input key error.");
     }
     else {
-      rcode = count;
-      *data_1byte = (datah << 4) + datal;
+      rcode = count;  // 16進数の数値取得
+      *pt_data = (datah << 4) + datal;
     }
   }
 
   return rcode;
 }
 
-static void debug_edit(char *area, uint8_t *target) {
-  uint8_t addr;
-  uint8_t data;
+static void debug_edit(char *addr_hi, uint8_t *target) {
+  uint8_t addr, data;
   uint8_t data_1byte;
   int8_t rcode;
 
   int8_t rcv_data = Serial.read();
   if (rcv_data == 'e') {
     Serial.print("\x1b[93m");   // 文字の色を黄に変更
-    Serial.print("[");
-    Serial.print(area);
-    Serial.println(" Edit mode start]");
-    Serial.print("Start Address = ");
+    Serial.println("[Edit mode start] End with Esc or Ret key.");
+    Serial.print("Start address = ");
+    Serial.print(addr_hi);
     rcode = recv_1byte(&data_1byte);
-    if (rcode < 0) {
-      Serial.println("");
-      if (rcode == -2) Serial.println("Input key error.");
-    }
-    else {
+    if (rcode >= 0) {
       addr = data_1byte;
       Serial.println("");
-      Serial.print("Data = ");
+      Serial.print("Update data = ");
       while (rcode >= 0) {
         rcode = recv_1byte(&data_1byte);
-        if (rcode < 0) {
-          Serial.println("");
-          if (rcode == -2) Serial.println("Input key error.");
-        }
-        else {
+        if (rcode >= 0) {
           data = data_1byte;
           target[addr++] = data;
           Serial.print(" ");
         }
       }
     }
-    Serial.print("[RAM Edit mode end]");
+    Serial.print("[Edit mode end]");
     Serial.println("\x1b[0m");  // 全ての変更を元に戻す
   }
 }
@@ -346,12 +340,12 @@ static void debug_req(void) {
     case 'm':   // RAM領域をダンプ
       Serial.println("RAM[ 0x0000-0x00FF ] =");
       echo_dump("00", &RAM[0]);
-      debug_edit("RAM", &RAM[0]);
+      debug_edit("00", &RAM[0]);
       break;
     case 'o':   // IO領域をダンプ
       Serial.println("IO[ 0x00-0xFF ] =");
       echo_dump("  ", &IO[0]);
-      debug_edit("IO", &IO[0]);
+      debug_edit("", &IO[0]);
       break;
     case 'i':   // INT端子を反転
       REV_INT();             // INT反転
@@ -404,14 +398,14 @@ static void debug_req(void) {
   }
 }
 
-static void debug_log(uint8_t* msg, uint8_t flag) {
+static void debug_log(char *msg, uint8_t flag) {
   static uint8_t event_flag = OFF;
   if (flag == OFF) {
     event_flag = OFF;
   }
   else if (event_flag == OFF) {
     event_flag = ON;
-    Serial.print((const char[])msg);
+    Serial.print(msg);
     Serial.print(": ADDR=0x");
     echo_hex(ADDR);
     if (flag == ON) {               // Except for Special flag ON2
