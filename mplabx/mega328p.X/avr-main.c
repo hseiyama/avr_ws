@@ -55,11 +55,20 @@ int main(void) {
     }
 }
 
-/* USART送信 */
-static void send_usart(uint8_t data) {
+/* USART送信 (1文字) */
+static void send_char(uint8_t data) {
     // USART送信ﾃﾞｰﾀ ﾚｼﾞｽﾀ空きﾌﾗｸﾞ=1 まで待機
     while(!(UCSR0A & (1 << UDRE0)));
     UDR0 = data;                // 送信データを設定
+}
+
+/* USART送信 (文字列) */
+static void send_strg(uint8_t *data) {
+    // 文字がNULLになるまで継続
+    while(*data != 0x00) {
+        send_char(*data);       // USART送信 (1文字)
+        data++;
+    }
 }
 
 /* タイマ割り込み */
@@ -70,15 +79,17 @@ ISR(TIMER1_COMPA_vect, ISR_BLOCK) {
 /* USART受信完了割り込み */
 ISR(USART_RX_vect, ISR_BLOCK) {
     usart_data = UDR0;          // 受信データを取得
-    send_usart(usart_data);     // USART送信
+    send_char(usart_data);      // USART送信 (1文字)
 }
 
 /* 外部割り込み0 */
 ISR(INT0_vect, ISR_BLOCK) {
-    send_usart('0');            // USART送信
+    uint8_t msg[] = ">ExtInt0\r\n";
+    send_strg(msg);             // USART送信 (文字列)
 }
 
 /* 外部割り込み1 */
 ISR(INT1_vect, ISR_BLOCK) {
-    send_usart('1');            // USART送信
+    uint8_t msg[] = ">ExtInt1\r\n";
+    send_strg(msg);             // USART送信 (文字列)
 }
