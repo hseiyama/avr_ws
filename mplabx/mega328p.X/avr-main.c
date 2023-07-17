@@ -14,6 +14,7 @@
 
 volatile uint8_t portD_timer;           // タイマ割り込みからの指示用
 volatile uint8_t usart_data;            // USART送受信データ
+volatile uint16_t adc0_data;            // ADC0入力データ
 
 int main(void) {
     /* Replace with your application code */
@@ -46,9 +47,14 @@ int main(void) {
     EIMSK = (1 << INT1) | (1 << INT0);
                                 // 外部割り込み0許可
                                 // 外部割り込み1許可
+    /* ADC初期化 */
+    ADMUX = (1 << REFS0);       // 基準電圧=AVCC, A/Dﾁｬﾈﾙ=ADC0
+    ADCSRA = (1 << ADEN) | (1 << ADIE) | (1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0);
+                                // A/D許可, A/D変換完了割り込み許可, A/D変換ｸﾛｯｸ=CK/128
     
     sei();                      // 割り込み許可
     while (1) {
+        /* PORT出力 */
         portD_in = (~PIND & PORTD_MASK_IN) ^ portD_timer;
         PORTD = (portD_in << 2) | (PORTD & ~PORTD_MASK_OUT);
                                 // PIND2,3 -> PORTD4,5
@@ -71,9 +77,27 @@ static void send_strg(uint8_t *data) {
     }
 }
 
+/* HEX数字送信 */
+static void echo_hex(uint8_t hex_data) {
+    uint8_t hex_table[] = {
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+    };
+  send_char(hex_table[(hex_data >> 4) & 0x0F]);
+  send_char(hex_table[hex_data & 0x0F]);
+}
+
+/* 16進数データ送信 (2byte) */
+static void echo_2byte(uint16_t data) {
+    uint8_t msg[] = "0x";
+    send_strg(msg);
+    echo_hex((data >> 8) & 0xFF);   // HEX数字送信
+    echo_hex(data & 0xFF);          // HEX数字送信
+}
+
 /* タイマ割り込み */
 ISR(TIMER1_COMPA_vect, ISR_BLOCK) {
     portD_timer = ~portD_timer;
+    ADCSRA |= (1 << ADSC);      // A/D変換開始
 }
 
 /* USART受信完了割り込み */
@@ -92,4 +116,14 @@ ISR(INT0_vect, ISR_BLOCK) {
 ISR(INT1_vect, ISR_BLOCK) {
     uint8_t msg[] = ">ExtInt1\r\n";
     send_strg(msg);             // USART送信 (文字列)
+}
+
+/* A/D変換完了割り込み */
+ISR(ADC_vect, ISR_BLOCK) {
+    uint8_t msg1[] = ">ADC0=";
+    uint8_t msg2[] = "\r\n";
+    adc0_data = ADC;            // A/D変換結果
+    send_strg(msg1);
+    echo_2byte(adc0_data);      // 16進数データ送信 (2byte)
+    send_strg(msg2);
 }
